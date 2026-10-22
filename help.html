@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>尺寸链分析工具使用说明书</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Microsoft YaHei", "SimHei", sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 28px;
+            margin-bottom: 10px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            color: #2c3e50;
+            font-size: 20px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-left: 10px;
+            border-left: 4px solid #3498db;
+        }
+        
+        h3 {
+            color: #34495e;
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        
+        ul, ol {
+            margin-bottom: 15px;
+            padding-left: 25px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+        }
+        
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        .formula {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-family: "Courier New", monospace;
+            text-align: center;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        
+        th {
+            background: #3498db;
+            color: white;
+        }
+        
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .tip {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .tip-title {
+            color: #155724;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .warning-title {
+            color: #856404;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .step {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        
+        .step-num {
+            width: 30px;
+            height: 30px;
+            background: #3498db;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #2980b9;
+        }
+        
+        .keyboard-key {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 2px 8px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-btn">← 返回工具</a>
+        
+        <h1>📐 尺寸链分析工具使用说明书</h1>
+        <div class="subtitle">版本 2.0 | 最后更新：2026-10-22</div>
+
+        <h2>第一章 工具概述</h2>
+        
+        <h3>1.1 什么是尺寸链分析</h3>
+        <p>尺寸链分析是机械设计和制造过程中的重要分析方法，用于计算封闭环与组成环之间的尺寸关系。通过分析尺寸链，可以：</p>
+        <ul>
+            <li>验证零件装配后的最终尺寸是否满足设计要求</li>
+            <li>合理分配各组成环的公差</li>
+            <li>预测装配后的合格率</li>
+            <li>优化设计方案，降低成本</li>
+        </ul>
+
+        <h3>1.2 工具功能特点</h3>
+        <ul>
+            <li><strong>图形化标注</strong>：支持在二维图纸上直接标注尺寸链</li>
+            <li><strong>多种计算方法</strong>：支持极值法和统计法两种计算方式</li>
+            <li><strong>轴孔配合分析</strong>：专门的轴孔配合计算功能，支持"是否有利"设置</li>
+            <li><strong>X设计值管理</strong>：可输入设计要求的X值范围，自动计算CPK</li>
+            <li><strong>数据导出导入</strong>：支持项目数据的保存和加载</li>
+            <li><strong>结果可视化</strong>：清晰的计算结果展示，含CPK过程能力指数</li>
+            <li><strong>便捷操作</strong>：支持鼠标中键拖动、滚轮缩放等快捷操作</li>
+        </ul>
+
+        <h2>第二章 界面说明</h2>
+        
+        <h3>2.1 主界面布局</h3>
+        <p>工具界面采用三栏布局：</p>
+        <ul>
+            <li><strong>左侧面板</strong>：图像上传、标注控制、标注点列表、尺寸链信息</li>
+            <li><strong>中间区域</strong>：图纸预览和标注操作区，支持缩放和拖动</li>
+            <li><strong>右侧面板</strong>：尺寸代号输入（X设计值、A/B/C...、轴孔尺寸）、计算结果和导出功能</li>
+        </ul>
+
+        <h3>2.2 标注点类型</h3>
+        <table>
+            <tr>
+                <th>类型</th>
+                <th>颜色</th>
+                <th>说明</th>
+                <th>编号规则</th>
+            </tr>
+            <tr>
+                <td>普通/起止点</td>
+                <td>🔵 蓝色</td>
+                <td>尺寸链的起点和终点</td>
+                <td>S（起点）→ 2,3... → E（终点）</td>
+            </tr>
+            <tr>
+                <td>轴孔点</td>
+                <td>🟢 绿色</td>
+                <td>轴孔配合位置</td>
+                <td>1, 2, 3... 顺序编号，显示"轴"字</td>
+            </tr>
+        </table>
+
+        <div class="warning">
+            <div class="warning-title">⚠️ 重要提示</div>
+            <p>普通点（S/E系列）和轴孔点（数字系列）使用独立的编号系统。普通点从S开始，轴孔点从1开始，各自顺序编号。</p>
+        </div>
+
+        <h2>第三章 操作指南</h2>
+        
+        <h3>3.1 基本操作流程</h3>
+        
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+                <strong>上传图纸</strong>
+                <p>点击左侧面板"点击上传图像"区域，选择需要分析的二维图纸图片（支持 JPG、PNG 格式）。或将图片直接拖拽到上传区域。</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+                <strong>设置项目名称</strong>
+                <p>在图像预览区域顶部的输入框中填写"项目+零件名称"，这将用于导出文件的命名。</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+                <strong>选择链方向</strong>
+                <p>在左侧面板选择链方向：<strong>X向（水平）</strong>或 <strong>Y向（垂直）</strong>。这将决定尺寸链的计算方向。</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+                <strong>选择标注类型</strong>
+                <p>选择标注类型：
+                <br>• <strong>普通/起止</strong>：用于标注尺寸链的起点S和终点E
+                <br>• <strong>轴孔</strong>：用于标注轴孔配合位置</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+                <strong>标注尺寸点</strong>
+                <p>在图纸上点击需要标注的位置。普通点按S→2→3→...→E的顺序，轴孔点按1→2→3→...的顺序。</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">6</div>
+            <div class="step-content">
+                <strong>生成尺寸链</strong>
+                <p>点击"✨ 生成"按钮，自动生成尺寸链信息。此时会在图纸上绘制尺寸线（红色）和延长线（蓝色虚线）。</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">7</div>
+            <div class="step-content">
+                <strong>输入X设计值</strong>
+                <p>在右侧面板最上方，输入<strong>X设计值的较小值</strong>和<strong>较大值</strong>（格式：较小值 ~ 较大值）。这是设计要求的封闭环范围。</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">8</div>
+            <div class="step-content">
+                <strong>输入各段尺寸</strong>
+                <p>输入A、B、C...各段的：基本尺寸、公差、CPK值、备注。对于轴孔尺寸，还需输入D（孔径）和d（轴径）的相关数据。</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">9</div>
+            <div class="step-content">
+                <strong>设置轴孔是否有利</strong>
+                <p>对于轴孔配合，在"是否有利"下拉框中选择：
+                <br>• <strong>是</strong>：间隙配合（有利，间隙为正）
+                <br>• <strong>否</strong>：过盈配合（不利，间隙为负）</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-num">10</div>
+            <div class="step-content">
+                <strong>执行计算</strong>
+                <p>点击"📊 计算"按钮，查看极值法和统计法的计算结果，包括公称值、公差、累积偏移和CPK值。</p>
+            </div>
+        </div>
+
+        <h3>3.2 图像操作技巧</h3>
+        <table>
+            <tr>
+                <th>操作</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td><span class="keyboard-key">左键点击</span></td>
+                <td>在图纸上添加标注点或拖动现有点</td>
+            </tr>
+            <tr>
+                <td><span class="keyboard-key">中键按住拖动</span></td>
+                <td>拖动图纸查看不同区域</td>
+            </tr>
+            <tr>
+                <td><span class="keyboard-key">滚轮</span></td>
+                <td>缩放图纸（以鼠标位置为中心）</td>
+            </tr>
+            <tr>
+                <td><span class="keyboard-key">+</span> / <span class="keyboard-key">-</span> 按钮</td>
+                <td>放大/缩小图纸</td>
+            </tr>
+            <tr>
+                <td><span class="keyboard-key">重置</span> 按钮</td>
+                <td>恢复原始缩放比例</td>
+            </tr>
+        </table>
+
+        <h3>3.3 标注点管理</h3>
+        <ul>
+            <li>在"标注点列表"中可查看所有已标注的点</li>
+            <li>点击"清空"按钮可删除所有标注点</li>
+            <li>标注点可在图纸上拖动调整位置</li>
+            <li>使用"显示点"和"显示线"复选框控制标注的显示</li>
+        </ul>
+
+        <h2>第四章 尺寸输入说明</h2>
+        
+        <h3>4.1 X设计值（封闭环设计值）</h3>
+        <p>X设计值是设计要求的封闭环尺寸范围，位于尺寸代号区域的最上方：</p>
+        <ul>
+            <li><strong>较小值</strong>：封闭环的最小允许值</li>
+            <li><strong>较大值</strong>：封闭环的最大允许值</li>
+            <li>格式：<code>较小值 ~ 较大值</code></li>
+        </ul>
+        <p>输入X设计值后，统计法计算结果会显示<strong>CPK值</strong>，用于评估过程能力。</p>
+
+        <h3>4.2 普通尺寸（A、B、C...）</h3>
+        <table>
+            <tr>
+                <th>参数</th>
+                <th>说明</th>
+                <th>示例</th>
+            </tr>
+            <tr>
+                <td>基本尺寸</td>
+                <td>该段的公称尺寸值</td>
+                <td>50.00</td>
+            </tr>
+            <tr>
+                <td>公差</td>
+                <td>尺寸公差值（±值）</td>
+                <td>0.05</td>
+            </tr>
+            <tr>
+                <td>CPK</td>
+                <td>过程能力指数（默认1.0）</td>
+                <td>1.33</td>
+            </tr>
+            <tr>
+                <td>备注</td>
+                <td>尺寸的中文名称或说明</td>
+                <td>轴承外径</td>
+            </tr>
+            <tr>
+                <td>正负号</td>
+                <td>绿色+表示增环，红色-表示减环</td>
+                <td>+ 或 -</td>
+            </tr>
+        </table>
+
+        <h3>4.3 轴孔尺寸（D1/d1、D2/d2...）</h3>
+        <p>每个轴孔包含以下参数：</p>
+        <table>
+            <tr>
+                <th>参数</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>D（大写）</td>
+                <td>孔径尺寸：基本尺寸、公差、CPK、备注</td>
+            </tr>
+            <tr>
+                <td>d（小写）</td>
+                <td>轴径尺寸：基本尺寸、公差、CPK、备注</td>
+            </tr>
+            <tr>
+                <td>是否有利</td>
+                <td>间隙配合选"是"，过盈配合选"否"</td>
+            </tr>
+        </table>
+
+        <div class="tip">
+            <div class="tip-title">💡 提示</div>
+            <p>轴孔间隙 = D（孔径）- d（轴径）。间隙配合时间隙为正（有利），过盈配合时间隙为负（不利）。</p>
+        </div>
+
+        <h2>第五章 计算方法说明</h2>
+        
+        <h3>5.1 极值法（完全互换法）</h3>
+        <p>极值法假设所有组成环同时处于极限状态，是最保守但最可靠的计算方法。</p>
+        
+        <div class="formula">
+            <strong>封闭环公称值：</strong>N₀ = Σ(增环) - Σ(减环) + Σ(轴孔间隙)<br><br>
+            <strong>公差累积：</strong>T₀ = Σ(普通尺寸公差) + Σ(轴孔公差)/2<br><br>
+            <strong>左极限：</strong>= 公称值 - 公差 - 累积偏移<br>
+            <strong>右极限：</strong>= 公称值 + 公差 + 累积偏移
+        </div>
+
+        <h3>5.2 统计法（概率法）</h3>
+        <p>统计法基于概率统计原理，假设尺寸服从正态分布，可以获得更宽松的公差要求。</p>
+        
+        <div class="formula">
+            <strong>单方差：</strong>σ² = (公差 / (3 × CPK))²<br><br>
+            <strong>整体方差：</strong>σ₀ = √(Σσ²)<br><br>
+            <strong>最终公差：</strong>T₀ = 4.5 × σ₀<br><br>
+            <strong>左极限：</strong>= 公称值 - 公差 - 累积偏移<br>
+            <strong>右极限：</strong>= 公称值 + 公差 + 累积偏移
+        </div>
+
+        <h3>5.3 CPK计算（过程能力指数）</h3>
+        <p>当输入X设计值后，统计法会计算CPK值：</p>
+        
+        <div class="formula">
+            <strong>CPK1</strong> = (X设计值较大值 - X公称值 - 累积偏移) / (3 × 整体方差)<br><br>
+            <strong>CPK2</strong> = (X公称值 - 累积偏移 - X设计值较小值) / (3 × 整体方差)<br><br>
+            <strong>CPK</strong> = min(CPK1, CPK2)
+        </div>
+        
+        <table>
+            <tr>
+                <th>CPK值</th>
+                <th>颜色</th>
+                <th>过程能力评估</th>
+            </tr>
+            <tr>
+                <td>≥ 1.33</td>
+                <td>🟢 绿色</td>
+                <td>过程能力充足，合格率高</td>
+            </tr>
+            <tr>
+                <td>1.0 ~ 1.33</td>
+                <td>🟡 黄色</td>
+                <td>过程能力尚可，需注意监控</td>
+            </tr>
+            <tr>
+                <td>&lt; 1.0</td>
+                <td>🔴 红色</td>
+                <td>过程能力不足，需要改进</td>
+            </tr>
+        </table>
+
+        <h3>5.4 增环与减环判定</h3>
+        <ul>
+            <li><strong>增环（+）</strong>：该尺寸增大时，封闭环也增大（绿色显示）</li>
+            <li><strong>减环（-）</strong>：该尺寸增大时，封闭环减小（红色显示）</li>
+            <li><strong>判定方法</strong>：根据标注点的坐标自动判断，从起点到终点，同向为增环，反向为减环</li>
+        </ul>
+
+        <h2>第六章 数据管理</h2>
+        
+        <h3>6.1 导出数据</h3>
+        <p>点击"导出数据"按钮，将保存包含以下内容的JSON文件：</p>
+        <ul>
+            <li>项目信息（名称、方向等）</li>
+            <li>原始图像数据（Base64编码）</li>
+            <li>标注点坐标和类型</li>
+            <li>所有尺寸数据（含X设计值、CPK等）</li>
+            <li>计算结果</li>
+        </ul>
+        <p>文件名格式：<code>项目名称_链方向.json</code></p>
+
+        <h3>6.2 导出图像</h3>
+        <p>点击"导出图像"按钮，将保存带有标注的图纸图片（PNG格式），方便存档和分享。</p>
+
+        <h3>6.3 加载数据</h3>
+        <p>点击"📂 加载数据"按钮，选择之前导出的JSON文件，即可恢复完整的项目状态，包括图纸、标注、尺寸数据和计算结果。</p>
+
+        <div class="tip">
+            <div class="tip-title">💡 提示</div>
+            <p>导出文件包含完整图像数据，文件可能较大。建议定期导出数据备份，并按项目分类管理导出文件。</p>
+        </div>
+
+        <h2>第七章 注意事项</h2>
+        
+        <h3>7.1 标注注意事项</h3>
+        <ul>
+            <li>普通点必须按S→...→E的顺序标注，且至少需要2个点才能形成封闭环</li>
+            <li>轴和孔的标注相互独立，编号各自从1开始</li>
+            <li>标注点位置应准确对应图纸上的特征位置</li>
+            <li>生成尺寸链后，蓝色虚线延长线会自动连接到对应的尺寸线</li>
+        </ul>
+
+        <h3>7.2 计算注意事项</h3>
+        <ul>
+            <li>确保所有尺寸数据都已正确输入</li>
+            <li>X设计值的较小值应小于或等于较大值</li>
+            <li>极值法结果更保守，统计法结果更宽松</li>
+            <li>建议关键尺寸使用极值法验证，一般尺寸可用统计法优化公差</li>
+            <li>CPK值≥1.33表示过程能力充足</li>
+        </ul>
+
+        <h3>7.3 浏览器兼容性</h3>
+        <ul>
+            <li>推荐使用 Chrome、Edge、Firefox 等现代浏览器</li>
+            <li>需要支持 HTML5 Canvas 和 File API</li>
+            <li>建议使用 1920×1080 或更高分辨率以获得最佳体验</li>
+        </ul>
+
+        <h2>第八章 常见问题</h2>
+        
+        <h3>Q1：为什么计算结果显示"请至少标注2个点"？</h3>
+        <p>A：尺寸链分析需要至少一个起点(S)和一个终点(E)才能形成封闭环。请确保已标注S和E两个点，并点击"生成"按钮。</p>
+
+        <h3>Q2：如何修改已经输入的尺寸数据？</h3>
+        <p>A：直接在右侧面板的输入框中修改数值即可。修改后需要重新点击"计算"按钮更新结果。</p>
+
+        <h3>Q3：轴和孔的编号为什么会重复？</h3>
+        <p>A：这是正常设计。普通点（S/E系列）和轴孔点（数字系列）使用独立的编号系统，各自从1（或S）开始编号，互不影响。</p>
+
+        <h3>Q4：导入数据后图纸显示不正常？</h3>
+        <p>A：请确保导入的JSON文件是由本工具导出的完整数据文件，且文件未被修改或损坏。导出文件包含图像数据，文件较大是正常的。</p>
+
+        <h3>Q5：CPK值显示为负数或很大？</h3>
+        <p>A：请检查：1）X设计值的较小值和较大值是否输入正确；2）各段尺寸数据是否合理；3）轴孔的"是否有利"设置是否正确。</p>
+
+        <h3>Q6：如何清空所有数据重新开始？</h3>
+        <p>A：点击左侧面板的"清空"按钮可删除所有标注点，然后可以重新标注。如需完全重置，可刷新页面。</p>
+
+        <h3>Q7：图像预览区域如何滚动查看？</h3>
+        <p>A：使用鼠标<span class="keyboard-key">中键按住拖动</span>可以平移图纸，使用<span class="keyboard-key">滚轮</span>可以缩放。也可以使用<span class="keyboard-key">+</span>/<span class="keyboard-key">-</span>按钮和滚动条。</p>
+
+        <div class="tip">
+            <div class="tip-title">💡 使用建议</div>
+            <p>建议在开始分析前先规划好尺寸链的走向和标注顺序，这样可以提高工作效率。对于复杂的尺寸链，可以先在纸上画出简图，明确各环的增减性质。定期导出数据备份，防止意外丢失。</p>
+        </div>
+
+        <hr style="margin: 40px 0; border: none; border-top: 1px solid #ddd;">
+        
+        <p style="text-align: center; color: #666; font-size: 12px;">
+            尺寸链分析工具 v2.0 | 在线访问：<a href="https://你的用户名.vercel.app" target="_blank">https://你的用户名.vercel.app</a>
+        </p>
+    </div>
+</body>
+</html>
