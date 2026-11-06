@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>尺寸链分析工具</title>
+    <title>尺寸链分析工具V1.1</title>
     <style>
         * {
             margin: 0;
@@ -399,10 +399,11 @@
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📤</div>
                     <div class="upload-text">
-                        点击上传图像<br>或拖拽文件到此处
+                        点击上传本地图片或Ctrl+V粘贴截图
                     </div>
                 </div>
                 <input type="file" id="fileInput" accept="image/*">
+                <button class="btn danger full" id="btnClearImage" style="margin-top: 8px; font-size: 12px; padding: 6px; display: none;">清除图像</button>
                 
                 <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e8e8e8;">
                     <div class="panel-title" style="font-size: 12px; margin-bottom: 6px;">📂 加载数据</div>
@@ -425,11 +426,12 @@
                     <div class="btn-group">
                         <button class="btn active" data-direction="horizontal" id="btnHorizontal">X向</button>
                         <button class="btn" data-direction="vertical" id="btnVertical">Y向</button>
+                        <button class="btn" data-direction="depth" id="btnDepth">Z向</button>
                     </div>
                 </div>
 
                 <div class="control-group">
-                    <label class="control-label">标注类型</label>
+                    <label class="control-label">标注类型 <span style="color: #999; font-weight: normal; font-size: 11px;">（默认左键：普通/起止，右键：轴孔）</span></label>
                     <div class="btn-group">
                         <button class="btn active" data-mode="normal" id="btnNormal">普通/起止</button>
                         <button class="btn" data-mode="axisHole" id="btnAxisHole">轴孔</button>
@@ -442,11 +444,14 @@
                 </div>
 
                 <div class="control-group" style="margin-top: 8px;">
-                    <label class="control-label">缩放</label>
-                    <div class="btn-group">
-                        <button class="btn" id="btnZoomIn">+</button>
-                        <button class="btn" id="btnZoomOut">-</button>
-                        <button class="btn" id="btnZoomReset">重置</button>
+                    <label class="control-label">尺寸链颜色</label>
+                    <div id="chainColorOptions" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <div class="color-dot active" data-color="#1890ff" style="width:22px;height:22px;border-radius:50%;background:#1890ff;cursor:pointer;border:2px solid #333;transform:scale(1.2);transition:all 0.2s;"></div>
+                        <div class="color-dot" data-color="#ff4d4f" style="width:22px;height:22px;border-radius:50%;background:#ff4d4f;cursor:pointer;border:2px solid transparent;transition:all 0.2s;"></div>
+                        <div class="color-dot" data-color="#52c41a" style="width:22px;height:22px;border-radius:50%;background:#52c41a;cursor:pointer;border:2px solid transparent;transition:all 0.2s;"></div>
+                        <div class="color-dot" data-color="#faad14" style="width:22px;height:22px;border-radius:50%;background:#faad14;cursor:pointer;border:2px solid transparent;transition:all 0.2s;"></div>
+                        <div class="color-dot" data-color="#722ed1" style="width:22px;height:22px;border-radius:50%;background:#722ed1;cursor:pointer;border:2px solid transparent;transition:all 0.2s;"></div>
+                        <div class="color-dot" data-color="#333333" style="width:22px;height:22px;border-radius:50%;background:#333333;cursor:pointer;border:2px solid transparent;transition:all 0.2s;"></div>
                     </div>
                 </div>
             </div>
@@ -520,10 +525,10 @@
 
             <!-- 导出按钮 -->
             <div class="panel panel-compact">
-                <div class="panel-title">💾 导出</div>
+                <div class="panel-title"> 导出</div>
                 <div style="display: flex; gap: 8px;">
-                    <button class="btn success" id="btnExportImage" style="flex: 1; font-size: 12px; padding: 6px;">导出图像</button>
-                    <button class="btn" id="btnExportData" style="flex: 1; font-size: 12px; padding: 6px;">导出数据</button>
+                    <button class="btn success" id="btnExportImage" style="flex: 1; font-size: 12px; padding: 6px;">复制图像</button>
+                    <button class="btn" id="btnExportData" style="flex: 1; font-size: 12px; padding: 6px;">保存项目</button>
                 </div>
             </div>
 

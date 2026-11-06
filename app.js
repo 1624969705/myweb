@@ -1,5 +1,5 @@
 /**
- * 尺寸链分析工具
+ * 尺寸链分析工具V1.1
  */
 
 // ==================== 全局状态 ====================
@@ -20,7 +20,12 @@ const state = {
     dimensionValues: {}, // 存储尺寸代号的值
     showPoints: true, // 是否显示标注点
     showLines: true, // 是否显示内部连线
-    projectName: '' // 项目名称
+    projectName: '', // 项目名称
+    labelOffsets: {}, // 存储 D/d 标注的偏移量 { pointIndex: { offsetX, offsetY } }
+    draggingLabel: null, // 正在拖动的标注信息 { pointIndex, startX, startY, startOffsetX, startOffsetY }
+    chainColor: '#1890ff', // 尺寸链颜色
+    chainLineOffsets: {}, // 存储每条尺寸线的单独偏移量 { lineIndex: offset }
+    draggingChainLine: null, // 正在拖动的尺寸线信息 { lineIndex, startX, startY, startOffset }
 };
 
 // ==================== DOM元素 ====================
@@ -70,6 +75,9 @@ function bindEvents() {
     elements.uploadArea.addEventListener('dragover', handleDragOver);
     elements.uploadArea.addEventListener('dragleave', handleDragLeave);
     elements.uploadArea.addEventListener('drop', handleDrop);
+    
+    // 剪切板粘贴事件
+    document.addEventListener('paste', handlePaste);
 
     // 数据文件加载
     const loadDataArea = document.getElementById('loadDataArea');
@@ -79,23 +87,44 @@ function bindEvents() {
         dataFileInput.addEventListener('change', handleDataFileSelect);
     }
 
+    // 清除图像
+    const btnClearImage = document.getElementById('btnClearImage');
+    if (btnClearImage) {
+        btnClearImage.addEventListener('click', clearImage);
+    }
+
     // 标注模式切换
     document.getElementById('btnNormal').addEventListener('click', () => setMode('normal'));
     document.getElementById('btnAxisHole').addEventListener('click', () => setMode('axisHole'));
 
-    // 方向切换
-    document.getElementById('btnVertical').addEventListener('click', () => setDirection('vertical'));
-    document.getElementById('btnHorizontal').addEventListener('click', () => setDirection('horizontal'));
+// 方向切换
+document.getElementById('btnVertical').addEventListener('click', () => setDirection('vertical'));
+document.getElementById('btnHorizontal').addEventListener('click', () => setDirection('horizontal'));
+document.getElementById('btnDepth').addEventListener('click', () => setDirection('depth'));
 
     // 按钮事件
     document.getElementById('btnGenerate').addEventListener('click', generateDimensionChain);
     document.getElementById('btnClear').addEventListener('click', clearAllPoints);
-    document.getElementById('btnZoomIn').addEventListener('click', zoomIn);
-    document.getElementById('btnZoomOut').addEventListener('click', zoomOut);
-    document.getElementById('btnZoomReset').addEventListener('click', zoomReset);
     document.getElementById('btnCalculate').addEventListener('click', calculateBoth);
     document.getElementById('btnExportImage').addEventListener('click', exportImage);
     document.getElementById('btnExportData').addEventListener('click', exportData);
+
+    // 尺寸链颜色选择
+    const colorDots = document.querySelectorAll('.color-dot');
+    colorDots.forEach(dot => {
+        dot.addEventListener('click', () => {
+            state.chainColor = dot.dataset.color;
+            colorDots.forEach(d => {
+                d.classList.remove('active');
+                d.style.borderColor = 'transparent';
+                d.style.transform = 'scale(1)';
+            });
+            dot.classList.add('active');
+            dot.style.borderColor = '#333';
+            dot.style.transform = 'scale(1.2)';
+            drawCanvas();
+        });
+    });
 
     // 显示/隐藏点切换
     const togglePoints = document.getElementById('togglePoints');
@@ -155,6 +184,7 @@ function setDirection(direction) {
 function updateDirectionButtons() {
     document.getElementById('btnVertical').classList.toggle('active', state.chainDirection === 'vertical');
     document.getElementById('btnHorizontal').classList.toggle('active', state.chainDirection === 'horizontal');
+    document.getElementById('btnDepth').classList.toggle('active', state.chainDirection === 'depth');
 }
 
 // ==================== 文件上传处理 ====================
@@ -179,6 +209,21 @@ function handleDrop(e) {
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
         loadImage(file);
+    }
+}
+
+// ==================== 剪切板粘贴处理 ====================
+function handlePaste(e) {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (file) loadImage(file);
+            return;
+        }
     }
 }
 
@@ -214,6 +259,7 @@ function loadImage(file) {
             state.imageLoaded = true;
             elements.emptyState.style.display = 'none';
             elements.canvas.style.display = 'block';
+            updateClearImageButton(true);
             resetView();
             drawCanvas();
             // 滚动到中心位置
@@ -222,6 +268,32 @@ function loadImage(file) {
         state.image.src = e.target.result;
     };
     reader.readAsDataURL(file);
+}
+
+function clearImage() {
+    state.image = null;
+    state.imageLoaded = false;
+    state.points = [];
+    state.labelOffsets = {};
+    state.axisHoleLabelPositions = {};
+    state.dimensionValues = {};
+    state.draggingLabel = null;
+    
+    elements.canvas.style.display = 'none';
+    elements.emptyState.style.display = 'block';
+    elements.pointList.innerHTML = '<p style="color: #999; text-align: center; padding: 10px; font-size: 12px;">暂无标注点</p>';
+    elements.chainInfo.innerHTML = '<p style="color: #999; text-align: center; padding: 10px; font-size: 12px;">请先生成尺寸链</p>';
+    elements.dimensionInputs.innerHTML = '<p style="color: #999; text-align: center; padding: 8px; font-size: 12px;">请先生成尺寸链</p>';
+    elements.resultBox.innerHTML = '点击按钮进行计算';
+    elements.fileInput.value = '';
+    updateClearImageButton(false);
+}
+
+function updateClearImageButton(hasImage) {
+    const btn = document.getElementById('btnClearImage');
+    if (btn) {
+        btn.style.display = hasImage ? 'block' : 'none';
+    }
 }
 
 // ==================== 画布操作 ====================
@@ -364,7 +436,7 @@ function drawDimensionLines() {
             ctx.stroke();
             
             // 根据方向绘制箭头
-            if (state.chainDirection === 'vertical') {
+            if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
                 drawYArrow(x1, y1, x2, y2);
             } else {
                 drawXArrow(x1, y1, x2, y2);
@@ -387,7 +459,7 @@ function drawDimensionLines() {
             ctx.stroke();
             ctx.setLineDash([]);
             
-            if (state.chainDirection === 'vertical') {
+            if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
                 drawYArrow(ex, ey, sx, sy);
             } else {
                 drawXArrow(ex, ey, sx, sy);
@@ -401,7 +473,10 @@ function drawDimensionLines() {
 
 function drawDimensionAnnotations(sortedPoints) {
     if (sortedPoints.length < 1) return;
-    
+
+    // 清除旧的线段记录
+    state.chainLineSegments = [];
+
     // 计算图片边界（考虑偏移）
     const imgLeft = state.canvasOffsetX;
     const imgRight = state.image.width * state.scale + state.canvasOffsetX;
@@ -410,31 +485,32 @@ function drawDimensionAnnotations(sortedPoints) {
     
     const lineSpacing = 20; // 尺寸线间距
     
-    if (state.chainDirection === 'vertical') {
-        // Y向尺寸链 - 尺寸线在图片左侧，垂直方向
-        const offsetX = imgLeft - 40; // 在图片左边外部
+    if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
+        // Y向/Z向尺寸链 - 尺寸线在图片左侧，垂直方向
+        // 每条线只能水平(X)方向单独拖动
+        const baseOffsetX = imgLeft - 40; // 基准X位置
         
         // 为每个点绘制水平虚线（延长线）
         let axisHoleCount = 0;
         sortedPoints.forEach((point, index) => {
             const py = point.y * state.scale + state.canvasOffsetY;
             
-            // 找到该点对应的尺寸线X位置
-            let pointSegX = offsetX;
+            // 找到该点对应的尺寸线X位置，应用该线的单独偏移
+            let pointSegX = baseOffsetX;
             for (let i = 0; i < sortedPoints.length - 1; i++) {
                 if (sortedPoints[i] === point || sortedPoints[i + 1] === point) {
-                    // 该点参与了第i条尺寸线，使用第i条尺寸线的X位置
-                    pointSegX = offsetX - (i * lineSpacing);
+                    const lineOffset = state.chainLineOffsets[i] || 0;
+                    pointSegX = baseOffsetX - (i * lineSpacing) + lineOffset;
                     break;
                 }
             }
-            // 如果是最后一个点，使用最后一条尺寸线的位置
             if (point === sortedPoints[sortedPoints.length - 1] && sortedPoints.length > 1) {
-                pointSegX = offsetX - ((sortedPoints.length - 2) * lineSpacing);
+                const lastLineOffset = state.chainLineOffsets[sortedPoints.length - 2] || 0;
+                pointSegX = baseOffsetX - ((sortedPoints.length - 2) * lineSpacing) + lastLineOffset;
             }
             
             // 水平虚线：从点向左延伸到对应的尺寸线位置
-            ctx.strokeStyle = '#1890ff';
+            ctx.strokeStyle = state.chainColor;
             ctx.lineWidth = 1;
             ctx.setLineDash([5, 5]);
             ctx.beginPath();
@@ -447,11 +523,11 @@ function drawDimensionAnnotations(sortedPoints) {
             if (point.type === PointType.AXIS_HOLE) {
                 axisHoleCount++;
                 const arrowY = py;
-                const arrowX = offsetX - 5;
+                const arrowX = pointSegX - 5;
                 const arrowSize = 5;
                 const gap = 3;
                 
-                ctx.strokeStyle = '#1890ff';
+                ctx.strokeStyle = state.chainColor;
                 ctx.lineWidth = 1.5;
                 ctx.setLineDash([]);
                 
@@ -471,12 +547,23 @@ function drawDimensionAnnotations(sortedPoints) {
                 ctx.closePath();
                 ctx.stroke();
                 
-                // 标注 D1/d1, D2/d2...
-                ctx.fillStyle = '#1890ff';
+                // 标注 D1/d1, D2/d2... (支持拖动偏移)
+                const labelKey = `axisHole_${axisHoleCount}`;
+                const offset = state.labelOffsets[labelKey] || { x: 0, y: 0 };
+                ctx.fillStyle = state.chainColor;
                 ctx.font = 'bold 10px Microsoft YaHei';
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'middle';
-                ctx.fillText('D' + axisHoleCount + '/d' + axisHoleCount, arrowX - 8, arrowY);
+                ctx.fillText('D' + axisHoleCount + '/d' + axisHoleCount, arrowX - 8 + offset.x, arrowY + offset.y);
+                
+                // 存储标注位置用于拖动检测
+                if (!state.axisHoleLabelPositions) state.axisHoleLabelPositions = {};
+                state.axisHoleLabelPositions[labelKey] = {
+                    x: arrowX - 8 + offset.x,
+                    y: arrowY + offset.y,
+                    width: 40,
+                    height: 14
+                };
             }
         });
         
@@ -484,13 +571,18 @@ function drawDimensionAnnotations(sortedPoints) {
         for (let i = 0; i < sortedPoints.length - 1; i++) {
             const p1 = sortedPoints[i];
             const p2 = sortedPoints[i + 1];
-            const segX = offsetX - (i * lineSpacing);
+            const lineOffset = state.chainLineOffsets[i] || 0;
+            const segX = baseOffsetX - (i * lineSpacing) + lineOffset;
             
             const y1 = p1.y * state.scale + state.canvasOffsetY;
             const y2 = p2.y * state.scale + state.canvasOffsetY;
             
+            // 存储线段用于拖动检测（记录线段索引）
+            if (!state.chainLineSegments) state.chainLineSegments = [];
+            state.chainLineSegments.push({ x1: segX, y1, x2: segX, y2, lineIndex: i });
+            
             // 绘制垂直尺寸线
-            ctx.strokeStyle = '#1890ff';
+            ctx.strokeStyle = state.chainColor;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(segX, y1);
@@ -508,7 +600,7 @@ function drawDimensionAnnotations(sortedPoints) {
             ctx.stroke();
             
             // 绘制单向箭头（根据Y坐标方向）
-            const arrowSize = 6;
+            const arrowSize = 10;
             const isDownward = p2.y > p1.y;
             ctx.beginPath();
             if (isDownward) {
@@ -521,27 +613,43 @@ function drawDimensionAnnotations(sortedPoints) {
                 ctx.lineTo(segX + arrowSize * 0.5, y2 + arrowSize * 2);
             }
             ctx.closePath();
-            ctx.fillStyle = '#1890ff';
+            ctx.fillStyle = state.chainColor;
             ctx.fill();
             
-            // 标注字母
+            // 标注字母（支持拖动偏移）
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             const letter = letters[i % letters.length];
-            ctx.fillStyle = '#1890ff';
+            const labelKey = `dim_${letter}`;
+            const offset = state.labelOffsets[labelKey] || { x: 0, y: 0 };
+            ctx.fillStyle = state.chainColor;
             ctx.font = 'bold 12px Microsoft YaHei';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
-            ctx.fillText(letter, segX - 8, (y1 + y2) / 2);
+            ctx.fillText(letter, segX - 8 + offset.x, (y1 + y2) / 2 + offset.y);
+            
+            // 存储标注位置用于拖动检测
+            if (!state.axisHoleLabelPositions) state.axisHoleLabelPositions = {};
+            state.axisHoleLabelPositions[labelKey] = {
+                x: segX - 8 + offset.x,
+                y: (y1 + y2) / 2 + offset.y,
+                width: 16,
+                height: 16
+            };
         }
         
         // 绘制封闭环尺寸线
         if (sortedPoints.length >= 2) {
             const firstPoint = sortedPoints[0];
             const lastPoint = sortedPoints[sortedPoints.length - 1];
-            const segX = offsetX - (sortedPoints.length * lineSpacing);
+            const closeLineIndex = sortedPoints.length - 1; // 封闭环使用单独的索引
+            const closeLineOffset = state.chainLineOffsets[closeLineIndex] || 0;
+            const segX = baseOffsetX - (sortedPoints.length * lineSpacing) + closeLineOffset;
             
             const y1 = firstPoint.y * state.scale + state.canvasOffsetY;
             const y2 = lastPoint.y * state.scale + state.canvasOffsetY;
+            
+            // 存储封闭环线段
+            state.chainLineSegments.push({ x1: segX, y1, x2: segX, y2, lineIndex: closeLineIndex });
             
             ctx.strokeStyle = '#9C27B0';
             ctx.lineWidth = 1.5;
@@ -559,18 +667,18 @@ function drawDimensionAnnotations(sortedPoints) {
             ctx.lineTo(segX + 4, y2);
             ctx.stroke();
             
-            // 箭头指向第一个点
-            const arrowSize = 6;
-            const isDownward = firstPoint.y > lastPoint.y;
+            // 箭头指向最后一个点（方向反转）
+            const arrowSize = 10;
+            const isDownward = lastPoint.y > firstPoint.y;
             ctx.beginPath();
             if (isDownward) {
-                ctx.moveTo(segX, y1 - arrowSize);
-                ctx.lineTo(segX - arrowSize * 0.5, y1 - arrowSize * 2);
-                ctx.lineTo(segX + arrowSize * 0.5, y1 - arrowSize * 2);
+                ctx.moveTo(segX, y2 - arrowSize);
+                ctx.lineTo(segX - arrowSize * 0.5, y2 - arrowSize * 2);
+                ctx.lineTo(segX + arrowSize * 0.5, y2 - arrowSize * 2);
             } else {
-                ctx.moveTo(segX, y1 + arrowSize);
-                ctx.lineTo(segX - arrowSize * 0.5, y1 + arrowSize * 2);
-                ctx.lineTo(segX + arrowSize * 0.5, y1 + arrowSize * 2);
+                ctx.moveTo(segX, y2 + arrowSize);
+                ctx.lineTo(segX - arrowSize * 0.5, y2 + arrowSize * 2);
+                ctx.lineTo(segX + arrowSize * 0.5, y2 + arrowSize * 2);
             }
             ctx.closePath();
             ctx.fillStyle = '#9C27B0';
@@ -585,29 +693,30 @@ function drawDimensionAnnotations(sortedPoints) {
         }
     } else {
         // X向尺寸链 - 尺寸线在图片上方，水平方向
-        const offsetY = imgTop - 40; // 在图片上边外部
+        // 每条线只能竖直(Y)方向单独拖动
+        const baseOffsetY = imgTop - 40; // 基准Y位置
         
         // 为每个点绘制垂直虚线（延长线）
         let axisHoleCount = 0;
         sortedPoints.forEach((point, index) => {
             const px = point.x * state.scale + state.canvasOffsetX;
             
-            // 找到该点对应的尺寸线Y位置
-            let pointSegY = offsetY;
+            // 找到该点对应的尺寸线Y位置，应用该线的单独偏移
+            let pointSegY = baseOffsetY;
             for (let i = 0; i < sortedPoints.length - 1; i++) {
                 if (sortedPoints[i] === point || sortedPoints[i + 1] === point) {
-                    // 该点参与了第i条尺寸线，使用第i条尺寸线的Y位置
-                    pointSegY = offsetY - (i * lineSpacing);
+                    const lineOffset = state.chainLineOffsets[i] || 0;
+                    pointSegY = baseOffsetY - (i * lineSpacing) + lineOffset;
                     break;
                 }
             }
-            // 如果是最后一个点，使用最后一条尺寸线的位置
             if (point === sortedPoints[sortedPoints.length - 1] && sortedPoints.length > 1) {
-                pointSegY = offsetY - ((sortedPoints.length - 2) * lineSpacing);
+                const lastLineOffset = state.chainLineOffsets[sortedPoints.length - 2] || 0;
+                pointSegY = baseOffsetY - ((sortedPoints.length - 2) * lineSpacing) + lastLineOffset;
             }
             
             // 垂直虚线：从点向上延伸到对应的尺寸线位置
-            ctx.strokeStyle = '#1890ff';
+            ctx.strokeStyle = state.chainColor;
             ctx.lineWidth = 1;
             ctx.setLineDash([5, 5]);
             ctx.beginPath();
@@ -620,11 +729,11 @@ function drawDimensionAnnotations(sortedPoints) {
             if (point.type === PointType.AXIS_HOLE) {
                 axisHoleCount++;
                 const arrowX = px;
-                const arrowY = offsetY - 5;
+                const arrowY = pointSegY - 5;
                 const arrowSize = 5;
                 const gap = 3;
                 
-                ctx.strokeStyle = '#1890ff';
+                ctx.strokeStyle = state.chainColor;
                 ctx.lineWidth = 1.5;
                 ctx.setLineDash([]);
                 
@@ -644,12 +753,23 @@ function drawDimensionAnnotations(sortedPoints) {
                 ctx.closePath();
                 ctx.stroke();
                 
-                // 标注 D1/d1, D2/d2...
-                ctx.fillStyle = '#1890ff';
+                // 标注 D1/d1, D2/d2... (支持拖动偏移)
+                const labelKey = `axisHole_${axisHoleCount}`;
+                const offset = state.labelOffsets[labelKey] || { x: 0, y: 0 };
+                ctx.fillStyle = state.chainColor;
                 ctx.font = 'bold 10px Microsoft YaHei';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillText('D' + axisHoleCount + '/d' + axisHoleCount, arrowX, arrowY - 8);
+                ctx.fillText('D' + axisHoleCount + '/d' + axisHoleCount, arrowX + offset.x, arrowY - 8 + offset.y);
+                
+                // 存储标注位置用于拖动检测
+                if (!state.axisHoleLabelPositions) state.axisHoleLabelPositions = {};
+                state.axisHoleLabelPositions[labelKey] = {
+                    x: arrowX + offset.x,
+                    y: arrowY - 8 + offset.y,
+                    width: 40,
+                    height: 14
+                };
             }
         });
         
@@ -657,13 +777,18 @@ function drawDimensionAnnotations(sortedPoints) {
         for (let i = 0; i < sortedPoints.length - 1; i++) {
             const p1 = sortedPoints[i];
             const p2 = sortedPoints[i + 1];
-            const segY = offsetY - (i * lineSpacing);
+            const lineOffset = state.chainLineOffsets[i] || 0;
+            const segY = baseOffsetY - (i * lineSpacing) + lineOffset;
             
             const x1 = p1.x * state.scale + state.canvasOffsetX;
             const x2 = p2.x * state.scale + state.canvasOffsetX;
             
+            // 存储线段用于拖动检测（记录线段索引）
+            if (!state.chainLineSegments) state.chainLineSegments = [];
+            state.chainLineSegments.push({ x1, y1: segY, x2, y2: segY, lineIndex: i });
+            
             // 绘制水平尺寸线
-            ctx.strokeStyle = '#1890ff';
+            ctx.strokeStyle = state.chainColor;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(x1, segY);
@@ -681,42 +806,56 @@ function drawDimensionAnnotations(sortedPoints) {
             ctx.stroke();
             
             // 绘制单向箭头（根据X坐标方向）
-            const arrowSize = 6;
-            const isRightward = p2.x > p1.x; // 如果终点在起点右侧，箭头向右
+            const arrowSize = 10;
+            const isRightward = p2.x > p1.x;
             ctx.beginPath();
             if (isRightward) {
-                // 向右箭头
                 ctx.moveTo(x2 - arrowSize, segY);
                 ctx.lineTo(x2 - arrowSize * 2, segY - arrowSize * 0.5);
                 ctx.lineTo(x2 - arrowSize * 2, segY + arrowSize * 0.5);
             } else {
-                // 向左箭头
                 ctx.moveTo(x2 + arrowSize, segY);
                 ctx.lineTo(x2 + arrowSize * 2, segY - arrowSize * 0.5);
                 ctx.lineTo(x2 + arrowSize * 2, segY + arrowSize * 0.5);
             }
             ctx.closePath();
-            ctx.fillStyle = '#1890ff';
+            ctx.fillStyle = state.chainColor;
             ctx.fill();
             
-            // 标注字母
+            // 标注字母（支持拖动偏移）
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             const letter = letters[i % letters.length];
-            ctx.fillStyle = '#1890ff';
+            const labelKey = `dim_${letter}`;
+            const offset = state.labelOffsets[labelKey] || { x: 0, y: 0 };
+            ctx.fillStyle = state.chainColor;
             ctx.font = 'bold 12px Microsoft YaHei';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
-            ctx.fillText(letter, (x1 + x2) / 2, segY - 8);
+            ctx.fillText(letter, (x1 + x2) / 2 + offset.x, segY - 8 + offset.y);
+            
+            // 存储标注位置用于拖动检测
+            if (!state.axisHoleLabelPositions) state.axisHoleLabelPositions = {};
+            state.axisHoleLabelPositions[labelKey] = {
+                x: (x1 + x2) / 2 + offset.x,
+                y: segY - 8 + offset.y,
+                width: 16,
+                height: 16
+            };
         }
         
         // 绘制封闭环尺寸线
         if (sortedPoints.length >= 2) {
             const firstPoint = sortedPoints[0];
             const lastPoint = sortedPoints[sortedPoints.length - 1];
-            const segY = offsetY - (sortedPoints.length * lineSpacing);
+            const closeLineIndex = sortedPoints.length - 1;
+            const closeLineOffset = state.chainLineOffsets[closeLineIndex] || 0;
+            const segY = baseOffsetY - (sortedPoints.length * lineSpacing) + closeLineOffset;
             
             const x1 = firstPoint.x * state.scale + state.canvasOffsetX;
             const x2 = lastPoint.x * state.scale + state.canvasOffsetX;
+            
+            // 存储封闭环线段
+            state.chainLineSegments.push({ x1, y1: segY, x2, y2: segY, lineIndex: closeLineIndex });
             
             ctx.strokeStyle = '#9C27B0';
             ctx.lineWidth = 1.5;
@@ -734,18 +873,18 @@ function drawDimensionAnnotations(sortedPoints) {
             ctx.lineTo(x2, segY + 4);
             ctx.stroke();
             
-            // 箭头指向第一个点
-            const arrowSize = 6;
-            const isRightward = firstPoint.x > lastPoint.x;
+            // 箭头指向最后一个点（方向反转）
+            const arrowSize = 10;
+            const isRightward = lastPoint.x > firstPoint.x;
             ctx.beginPath();
             if (isRightward) {
-                ctx.moveTo(x1 - arrowSize, segY);
-                ctx.lineTo(x1 - arrowSize * 2, segY - arrowSize * 0.5);
-                ctx.lineTo(x1 - arrowSize * 2, segY + arrowSize * 0.5);
+                ctx.moveTo(x2 - arrowSize, segY);
+                ctx.lineTo(x2 - arrowSize * 2, segY - arrowSize * 0.5);
+                ctx.lineTo(x2 - arrowSize * 2, segY + arrowSize * 0.5);
             } else {
-                ctx.moveTo(x1 + arrowSize, segY);
-                ctx.lineTo(x1 + arrowSize * 2, segY - arrowSize * 0.5);
-                ctx.lineTo(x1 + arrowSize * 2, segY + arrowSize * 0.5);
+                ctx.moveTo(x2 + arrowSize, segY);
+                ctx.lineTo(x2 + arrowSize * 2, segY - arrowSize * 0.5);
+                ctx.lineTo(x2 + arrowSize * 2, segY + arrowSize * 0.5);
             }
             ctx.closePath();
             ctx.fillStyle = '#9C27B0';
@@ -835,16 +974,46 @@ function handleMouseDown(e) {
         return;
     }
     
-    // 左键添加/拖动点
+    // 左键添加/拖动点或标注
     if (e.button === 0) {
         const rect = elements.canvas.getBoundingClientRect();
-        // 考虑画布偏移量
-        const x = (e.clientX - rect.left - state.canvasOffsetX) / state.scale;
-        const y = (e.clientY - rect.top - state.canvasOffsetY) / state.scale;
+        // 鼠标在画布上的像素坐标
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+        // 世界坐标（用于添加点和拖动点）
+        const x = (canvasX - state.canvasOffsetX) / state.scale;
+        const y = (canvasY - state.canvasOffsetY) / state.scale;
         
+        // 先检查是否点击了 D/d 标注（用画布像素坐标）
+        const clickedLabel = findLabelAt(canvasX, canvasY);
+        if (clickedLabel) {
+            state.draggingLabel = {
+                labelKey: clickedLabel,
+                startX: e.clientX,
+                startY: e.clientY,
+                startOffsetX: state.labelOffsets[clickedLabel]?.x || 0,
+                startOffsetY: state.labelOffsets[clickedLabel]?.y || 0
+            };
+            elements.canvas.style.cursor = 'move';
+            return;
+        }
+
+        // 检查是否点击了尺寸链线（用于拖动单条尺寸链）
+        const clickedChain = findChainLineAt(canvasX, canvasY);
+        if (clickedChain) {
+            state.draggingChainLine = {
+                lineIndex: clickedChain.lineIndex,
+                startX: e.clientX,
+                startY: e.clientY,
+                startOffset: state.chainLineOffsets[clickedChain.lineIndex] || 0
+            };
+            elements.canvas.style.cursor = 'move';
+            return;
+        }
+
         // 检查是否点击了现有点
         const clickedIndex = findPointAt(x, y);
-        
+
         if (clickedIndex >= 0) {
             state.isDragging = true;
             state.dragPointIndex = clickedIndex;
@@ -852,6 +1021,14 @@ function handleMouseDown(e) {
             // 添加新点（允许在图片外面添加）
             addPoint(x, y);
         }
+    }
+    
+    // 右键添加轴孔点
+    if (e.button === 2) {
+        const rect = elements.canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - state.canvasOffsetX) / state.scale;
+        const y = (e.clientY - rect.top - state.canvasOffsetY) / state.scale;
+        addPoint(x, y, PointType.AXIS_HOLE);
     }
 }
 
@@ -865,18 +1042,78 @@ function handleMouseMove(e) {
         elements.canvasWrapper.scrollTop = state.panScrollTop - dy;
         return;
     }
-    
+
+    // 拖动单条尺寸链
+    if (state.draggingChainLine) {
+        const lineIndex = state.draggingChainLine.lineIndex;
+        
+        // 根据尺寸链方向限制拖动方向
+        if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
+            // Y向/Z向尺寸链：只能水平(X)方向拖动
+            const dx = (e.clientX - state.draggingChainLine.startX) / state.scale;
+            state.chainLineOffsets[lineIndex] = state.draggingChainLine.startOffset + dx;
+        } else {
+            // X向尺寸链：只能竖直(Y)方向拖动
+            const dy = (e.clientY - state.draggingChainLine.startY) / state.scale;
+            state.chainLineOffsets[lineIndex] = state.draggingChainLine.startOffset + dy;
+        }
+
+        drawCanvas();
+        return;
+    }
+
+    // 拖动 D/d 标注
+    if (state.draggingLabel) {
+        const dx = (e.clientX - state.draggingLabel.startX) / state.scale;
+        const dy = (e.clientY - state.draggingLabel.startY) / state.scale;
+
+        if (!state.labelOffsets[state.draggingLabel.labelKey]) {
+            state.labelOffsets[state.draggingLabel.labelKey] = { x: 0, y: 0 };
+        }
+        state.labelOffsets[state.draggingLabel.labelKey].x = state.draggingLabel.startOffsetX + dx;
+        state.labelOffsets[state.draggingLabel.labelKey].y = state.draggingLabel.startOffsetY + dy;
+
+        drawCanvas();
+        return;
+    }
+
+    // 鼠标悬停时检查是否在标注或点上，改变光标样式
+    if (!state.isDragging && state.imageLoaded) {
+        const rect = elements.canvas.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+        const x = (canvasX - state.canvasOffsetX) / state.scale;
+        const y = (canvasY - state.canvasOffsetY) / state.scale;
+
+        const hoveredLabel = findLabelAt(canvasX, canvasY);
+        const hoveredChain = findChainLineAt(canvasX, canvasY);
+        const hoveredPoint = findPointAt(x, y);
+        
+        if (hoveredLabel || hoveredPoint >= 0) {
+            elements.canvas.style.cursor = 'move';
+        } else if (hoveredChain) {
+            // 根据尺寸链方向显示不同的光标
+            if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
+                elements.canvas.style.cursor = 'ew-resize'; // Y向：左右箭头
+            } else {
+                elements.canvas.style.cursor = 'ns-resize'; // X向：上下箭头
+            }
+        } else {
+            elements.canvas.style.cursor = 'crosshair';
+        }
+    }
+
     // 左键拖动点
     if (!state.isDragging || state.dragPointIndex < 0) return;
-    
+
     const rect = elements.canvas.getBoundingClientRect();
     // 考虑画布偏移量
     const x = (e.clientX - rect.left - state.canvasOffsetX) / state.scale;
     const y = (e.clientY - rect.top - state.canvasOffsetY) / state.scale;
-    
+
     state.points[state.dragPointIndex].x = x;
     state.points[state.dragPointIndex].y = y;
-    
+
     drawCanvas();
     updatePointList();
 }
@@ -887,7 +1124,19 @@ function handleMouseUp(e) {
         state.isPanning = false;
         elements.canvas.style.cursor = 'crosshair';
     }
-    
+
+    // 结束单条尺寸链拖动
+    if (state.draggingChainLine) {
+        state.draggingChainLine = null;
+        elements.canvas.style.cursor = 'crosshair';
+    }
+
+    // 结束 D/d 标注拖动
+    if (state.draggingLabel) {
+        state.draggingLabel = null;
+        elements.canvas.style.cursor = 'crosshair';
+    }
+
     // 结束左键拖动点
     state.isDragging = false;
     state.dragPointIndex = -1;
@@ -903,11 +1152,65 @@ function findPointAt(x, y) {
     return -1;
 }
 
-function addPoint(x, y) {
+// 检测是否点击了 D/d 标注（传入画布像素坐标）
+function findLabelAt(canvasX, canvasY) {
+    if (!state.axisHoleLabelPositions) return null;
+
+    const threshold = 10; // 像素容差
+
+    for (const [labelKey, pos] of Object.entries(state.axisHoleLabelPositions)) {
+        const halfW = pos.width / 2 + threshold;
+        const halfH = pos.height / 2 + threshold;
+
+        if (Math.abs(canvasX - pos.x) < halfW && Math.abs(canvasY - pos.y) < halfH) {
+            return labelKey;
+        }
+    }
+
+    return null;
+}
+
+// 检测是否点击了尺寸链线（传入画布像素坐标）
+function findChainLineAt(canvasX, canvasY) {
+    if (!state.chainLineSegments) return null;
+
+    const threshold = 8; // 像素容差
+
+    for (const seg of state.chainLineSegments) {
+        // 计算点到线段的距离
+        const dist = pointToSegmentDistance(canvasX, canvasY, seg.x1, seg.y1, seg.x2, seg.y2);
+        if (dist < threshold) {
+            return seg;
+        }
+    }
+
+    return null;
+}
+
+// 计算点到线段的距离
+function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+
+    if (lenSq === 0) {
+        return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+    }
+
+    let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+
+    const projX = x1 + t * dx;
+    const projY = y1 + t * dy;
+
+    return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
+}
+
+function addPoint(x, y, type) {
     const point = {
         x: x,
         y: y,
-        type: state.currentMode,
+        type: type || state.currentMode,
         id: Date.now()
     };
     
@@ -984,7 +1287,13 @@ function generateDimensionChain() {
     // 显示尺寸链信息
     const sortedPoints = [...state.points].sort((a, b) => a.id - b.id);
     let html = '<div class="chain-info">';
-    html += '<div class="chain-row"><span>方向:</span><span>' + (state.chainDirection === 'vertical' ? 'Y向(垂直)' : 'X向(水平)') + '</span></div>';
+    let directionText = 'X向(水平)';
+    if (state.chainDirection === 'vertical') {
+        directionText = 'Y向(垂直)';
+    } else if (state.chainDirection === 'depth') {
+        directionText = 'Z向(深度)';
+    }
+    html += '<div class="chain-row"><span>方向:</span><span>' + directionText + '</span></div>';
     html += '<div class="chain-row"><span>总点数:</span><span>' + state.points.length + '</span></div>';
     html += '</div>';
     elements.chainInfo.innerHTML = html;
@@ -1004,7 +1313,7 @@ function generateDimensionInputs(sortedPoints) {
     
     // 封闭环方向判断
     let isClosedLoopPositive;
-    if (state.chainDirection === 'vertical') {
+    if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
         isClosedLoopPositive = firstPoint.y > lastPoint.y; // 第一个点在最后一个点下方为正
     } else {
         isClosedLoopPositive = firstPoint.x > lastPoint.x; // 第一个点在最后一个点右侧为正
@@ -1082,7 +1391,7 @@ function generateDimensionInputs(sortedPoints) {
                     <div style="font-size: 11px; color: #52c41a; font-weight: bold; margin-bottom: 6px;">轴孔 ${axisHoleCount}</div>
                     <!-- D1 行：尺寸 + 公差 + CPK + 备注 -->
                     <div class="dimension-row" style="margin-bottom: 6px;">
-                        <label class="dimension-label" style="color: #1890ff; min-width: 30px;">${dKey}:</label>
+                        <label class="dimension-label" style="color: ${state.chainColor}; min-width: 30px;">${dKey}:</label>
                         <input type="number" class="dimension-input" data-dim="${dKey}" value="${dValue}" placeholder="孔径" onchange="updateDimensionValue('${dKey}', this.value)" style="flex: 1;">
                         <span style="margin: 0 3px; color: #999;">±</span>
                         <input type="number" class="dimension-input tolerance-input" data-dim="${dKey}_tol" value="${dTol}" placeholder="公差" onchange="updateDimensionValue('${dKey}_tol', this.value)">
@@ -1167,7 +1476,7 @@ function calculateBoth() {
                 <div id="extremeResultContent" style="font-size: 12px; line-height: 1.6;">计算中...</div>
             </div>
             <div style="background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 4px; padding: 12px;">
-                <div style="font-weight: bold; color: #1890ff; margin-bottom: 8px; font-size: 14px;">统计法</div>
+                <div style="font-weight: bold; color: ${state.chainColor}; margin-bottom: 8px; font-size: 14px;">统计法</div>
                 <div id="statResultContent" style="font-size: 12px; line-height: 1.6;">计算中...</div>
             </div>
         </div>
@@ -1367,7 +1676,7 @@ function getDimensions() {
         const p1 = sorted[i];
         const p2 = sorted[i + 1];
         let isIncreasing;
-        if (state.chainDirection === 'vertical') {
+        if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
             isIncreasing = p2.y > p1.y; // 向下为正
         } else {
             isIncreasing = p2.x > p1.x; // 向右为正
@@ -1376,7 +1685,7 @@ function getDimensions() {
         // 如果用户输入了值（包括0），使用用户输入的值
         // 如果没有输入，使用坐标距离
         if (value === null || value === undefined) {
-            if (state.chainDirection === 'vertical') {
+            if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
                 value = Math.abs(p2.y - p1.y);
             } else {
                 value = Math.abs(p2.x - p1.x);
@@ -1447,10 +1756,97 @@ function exportImage() {
         return;
     }
     
+    // 创建裁剪后的画布，只包含图片+尺寸链内容
+    const exportCanvas = createCroppedCanvas();
+    
+    // 检查是否支持剪贴板API
+    if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+        exportCanvas.toBlob(async (blob) => {
+            if (!blob) {
+                downloadImage(exportCanvas);
+                return;
+            }
+            try {
+                await navigator.clipboard.write([
+                    new ClipboardItem({ 'image/png': blob })
+                ]);
+                showToast('图像已复制到剪贴板');
+            } catch (err) {
+                console.warn('复制到剪贴板失败:', err);
+                downloadImage(exportCanvas);
+            }
+        }, 'image/png');
+    } else {
+        downloadImage(exportCanvas);
+    }
+}
+
+function createCroppedCanvas() {
+    const scale = state.scale;
+    const imgW = state.image.width * scale;
+    const imgH = state.image.height * scale;
+    const padding = 20; // 边距
+    
+    // 计算尺寸链标注占用的额外空间
+    const sortedPoints = [...state.points].sort((a, b) => a.id - b.id);
+    const lineSpacing = 20;
+    const annotationCount = sortedPoints.length;
+    const annotationSpace = annotationCount * lineSpacing + 60; // 标注区域宽度
+    
+    let cropX, cropY, cropW, cropH;
+    
+    if (state.chainDirection === 'vertical' || state.chainDirection === 'depth') {
+        // 垂直方向：左侧有标注，右侧是图片
+        cropX = state.canvasOffsetX - annotationSpace;
+        cropY = state.canvasOffsetY - padding;
+        cropW = imgW + annotationSpace + padding * 2;
+        cropH = imgH + padding * 2;
+    } else {
+        // 水平方向：上方有标注，下方是图片
+        cropX = state.canvasOffsetX - padding;
+        cropY = state.canvasOffsetY - annotationSpace;
+        cropW = imgW + padding * 2;
+        cropH = imgH + annotationSpace + padding * 2;
+    }
+    
+    // 确保不超出画布范围
+    cropX = Math.max(0, cropX);
+    cropY = Math.max(0, cropY);
+    cropW = Math.min(elements.canvas.width - cropX, cropW);
+    cropH = Math.min(elements.canvas.height - cropY, cropH);
+    
+    // 创建新画布并裁剪
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = cropW;
+    tempCanvas.height = cropH;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(elements.canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    
+    return tempCanvas;
+}
+
+function downloadImage(canvas) {
+    const target = canvas || elements.canvas;
     const link = document.createElement('a');
     link.download = '尺寸链分析_' + new Date().getTime() + '.png';
-    link.href = elements.canvas.toDataURL();
+    link.href = target.toDataURL();
     link.click();
+}
+
+function showToast(message) {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 24px;border-radius:6px;font-size:14px;z-index:99999;opacity:0;transition:opacity 0.3s;pointer-events:none;';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+        toast.style.opacity = '0';
+    }, 2000);
 }
 
 function exportData() {
@@ -1475,10 +1871,14 @@ function exportData() {
         dimensionValues: state.dimensionValues,
         // 图像缩放比例
         scale: state.scale,
+        // D/d 标注偏移量（用于恢复标注位置）
+        labelOffsets: state.labelOffsets,
+        // 尺寸链线条偏移量（用于恢复拖动后的位置）
+        chainLineOffsets: state.chainLineOffsets,
         // 导出时间
         exportTime: new Date().toLocaleString(),
         // 版本号
-        version: '1.0'
+        version: '1.2'
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1486,7 +1886,12 @@ function exportData() {
     
     // 构建文件名：项目名称 + 链方向
     const projectName = state.projectName || '尺寸链分析';
-    const directionText = state.chainDirection === 'vertical' ? 'Y向' : 'X向';
+    let directionText = 'X向';
+    if (state.chainDirection === 'vertical') {
+        directionText = 'Y向';
+    } else if (state.chainDirection === 'depth') {
+        directionText = 'Z向';
+    }
     const fileName = projectName + '_' + directionText + '.json';
     
     link.download = fileName;
@@ -1541,6 +1946,16 @@ function importData(jsonData) {
                     state.dimensionValues = data.dimensionValues;
                 }
                 
+                // 加载尺寸链线条偏移量
+                if (data.chainLineOffsets) {
+                    state.chainLineOffsets = data.chainLineOffsets;
+                }
+                
+                // 加载标注标签偏移量
+                if (data.labelOffsets) {
+                    state.labelOffsets = data.labelOffsets;
+                }
+                
                 // 加载项目名称
                 if (data.projectName) {
                     state.projectName = data.projectName;
@@ -1578,6 +1993,12 @@ function importData(jsonData) {
             }
             if (data.dimensionValues) {
                 state.dimensionValues = data.dimensionValues;
+            }
+            if (data.chainLineOffsets) {
+                state.chainLineOffsets = data.chainLineOffsets;
+            }
+            if (data.labelOffsets) {
+                state.labelOffsets = data.labelOffsets;
             }
             if (data.projectName) {
                 state.projectName = data.projectName;
